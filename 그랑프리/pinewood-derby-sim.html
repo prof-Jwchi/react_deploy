@@ -1,0 +1,1282 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>피니언 카 물리 시뮬레이터 — Awana Grand Prix</title>
+<style>
+  :root {
+    --navy: #1e3a5f;
+    --navy-dark: #142a47;
+    --navy-light: #2c5282;
+    --gold: #d4a017;
+    --gold-light: #f0c040;
+    --bg: #0f1a2b;
+    --panel: #1a2438;
+    --panel-2: #243049;
+    --text: #e6edf7;
+    --text-dim: #97a3bd;
+    --danger: #e74c3c;
+    --ok: #2ecc71;
+    --border: #2d3a55;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Malgun Gothic", "맑은 고딕", sans-serif; }
+
+  .app {
+    display: grid;
+    grid-template-columns: 320px 1fr 280px;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .top-banner {
+    text-align: center;
+    padding: 14px 12px 4px;
+    font-size: 22px;
+    font-weight: 800;
+    background: linear-gradient(90deg, transparent 0%, rgba(212,160,23,0.18) 50%, transparent 100%);
+    color: var(--gold-light);
+    letter-spacing: 1.5px;
+    text-shadow: 0 0 12px rgba(212,160,23,0.4);
+  }
+  .top-banner .accent { color: #fff; margin: 0 8px; }
+
+  .bottom-banner {
+    text-align: center;
+    padding: 10px 12px 18px;
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    font-style: italic;
+  }
+  .bottom-banner .brand {
+    color: var(--gold);
+    font-weight: 700;
+    font-style: normal;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    overflow-y: auto;
+  }
+
+  h1 {
+    font-size: 18px;
+    margin: 0 0 12px;
+    color: var(--gold);
+    letter-spacing: 0.3px;
+  }
+  h2 {
+    font-size: 13px;
+    margin: 16px 0 8px;
+    color: var(--gold-light);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 4px;
+  }
+
+  /* sliders */
+  .ctrl { margin-bottom: 10px; }
+  .ctrl-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 12px; margin-bottom: 4px; }
+  .ctrl-name { color: var(--text); }
+  .ctrl-val {
+    color: var(--gold-light);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    background: var(--panel-2);
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+  }
+  input[type="range"] {
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--gold);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--navy-dark);
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    background: var(--gold);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid var(--navy-dark);
+  }
+
+  /* buttons */
+  .btn-row { display: flex; gap: 8px; margin-top: 14px; }
+  button {
+    flex: 1;
+    padding: 10px;
+    background: var(--gold);
+    color: var(--navy-dark);
+    border: none;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 13px;
+    cursor: pointer;
+    transition: transform 0.05s, background 0.15s;
+  }
+  button:hover { background: var(--gold-light); }
+  button:active { transform: translateY(1px); }
+  button.secondary {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.secondary:hover { background: var(--border); }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* checkbox */
+  .check-row { display: flex; align-items: center; gap: 8px; font-size: 12px; margin: 6px 0; cursor: pointer; }
+  .check-row input { accent-color: var(--gold); }
+
+  /* canvas */
+  .canvas-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+  }
+  canvas {
+    background: linear-gradient(180deg, #87ceeb 0%, #b8d8e8 60%, #d2e3ed 100%);
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    display: block;
+    width: 100%;
+    max-width: 800px;
+    height: auto;
+    aspect-ratio: 800 / 500;
+  }
+  .canvas-wrap { width: 100%; }
+
+  /* 캔버스 바로 아래 출발/리셋 (모든 화면에서 표시) */
+  .canvas-controls {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 800px;
+    margin-top: 8px;
+  }
+  .canvas-controls button {
+    flex: 1;
+    padding: 12px 8px;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  }
+
+  /* ============== 모바일 / 태블릿 ============== */
+  @media (max-width: 1080px) {
+    .app {
+      grid-template-columns: 1fr;
+      gap: 10px;
+      padding: 8px;
+    }
+    /* 모바일에서는 캔버스 먼저, 결과, 설정 순으로 배치 */
+    .canvas-wrap { order: 1; position: sticky; top: 0; z-index: 10; background: var(--bg); padding-bottom: 6px; }
+    .canvas-controls { margin-top: 6px; }
+    .canvas-controls button { font-size: 15px; padding: 14px 8px; }
+    #rightPanel { order: 2; }
+    #leftPanel { order: 3; }
+
+    .panel {
+      max-height: none;
+      padding: 12px;
+    }
+  }
+
+  @media (max-width: 600px) {
+    .top-banner {
+      font-size: 15px;
+      padding: 8px 6px 2px;
+      letter-spacing: 0.5px;
+    }
+    .top-banner .accent { margin: 0 4px; }
+    .app { padding: 6px; gap: 8px; }
+    .panel { padding: 10px; border-radius: 8px; }
+    h1 { font-size: 16px; margin-bottom: 8px; }
+    h2 { font-size: 12px; margin: 12px 0 6px; }
+    button { padding: 12px 8px; font-size: 13px; }   /* 손가락 터치 영역 확보 */
+    .btn-row { gap: 6px; margin-top: 8px; }
+    input[type="range"] { height: 6px; }
+    input[type="range"]::-webkit-slider-thumb { width: 20px; height: 20px; }  /* 터치 핸들 크게 */
+    input[type="range"]::-moz-range-thumb { width: 20px; height: 20px; }
+    .ctrl-row { font-size: 12px; }
+    .ctrl-val { font-size: 11px; }
+    .stat { font-size: 12px; padding: 5px 0; }
+    .stat-val.big { font-size: 18px; }
+    .theory { font-size: 11px; }
+    .bottom-banner { font-size: 11px; padding: 8px; }
+  }
+
+  /* 가로 모드 폰: 캔버스가 너무 작아지지 않도록 */
+  @media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+    .top-banner { font-size: 13px; padding: 4px; }
+    .canvas-wrap { position: static; }
+  }
+
+  /* results */
+  .stat {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    font-size: 12px;
+  }
+  .stat:last-child { border-bottom: none; }
+  .stat-label { color: var(--text-dim); }
+  .stat-val { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--text); }
+  .stat-val.big { font-size: 20px; color: var(--gold-light); }
+
+  .warn-box {
+    background: rgba(231, 76, 60, 0.15);
+    border: 1px solid var(--danger);
+    color: var(--danger);
+    padding: 8px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 8px;
+    display: none;
+  }
+  .warn-box.show { display: block; }
+
+  .ok-box {
+    background: rgba(46, 204, 113, 0.12);
+    border: 1px solid var(--ok);
+    color: var(--ok);
+    padding: 6px;
+    border-radius: 6px;
+    font-size: 11px;
+    text-align: center;
+    margin-top: 6px;
+  }
+
+  /* validation panel */
+  .theory {
+    background: var(--panel-2);
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-top: 8px;
+  }
+  .theory .formula { color: var(--gold-light); font-variant-numeric: tabular-nums; }
+  .theory .status-ok { color: var(--ok); font-weight: 700; }
+  .theory .status-bad { color: var(--danger); font-weight: 700; }
+
+  /* records list */
+  .records { margin-top: 8px; }
+  .record-item {
+    background: var(--panel-2);
+    padding: 6px 8px;
+    border-radius: 5px;
+    margin-bottom: 5px;
+    font-size: 11px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .record-item .rec-name { color: var(--text); }
+  .record-item .rec-time { color: var(--gold-light); font-variant-numeric: tabular-nums; font-weight: 700; }
+  .record-item .rec-del { color: var(--danger); cursor: pointer; background: none; border: none; padding: 0 4px; font-size: 14px; }
+
+  footer {
+    margin-top: 12px;
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="top-banner">🏁 <span class="accent">남서울은혜교회 Trek</span> 화이팅! 🏆</div>
+<div class="app">
+
+  <!-- ============== 좌측 설정 패널 ============== -->
+  <div class="panel" id="leftPanel">
+    <h1>⚙️ 차량 설정</h1>
+
+    <div class="btn-row" style="margin-top:0;">
+      <button id="saveBtn" class="secondary">💾 기록 저장</button>
+      <button id="clearRecBtn" class="secondary">🗑 비교 초기화</button>
+    </div>
+
+    <h2>차량 제원</h2>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">차량 질량 m</span><span class="ctrl-val" id="mVal">142 g</span></div>
+      <input type="range" id="m" min="50" max="142" step="1" value="142" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">휠베이스 L</span><span class="ctrl-val" id="LVal">16.5 cm</span></div>
+      <input type="range" id="L" min="10" max="18" step="0.1" value="16.5" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">무게중심 수평 d <span style="color:#7aa">(뒷축 → 앞쪽)</span></span><span class="ctrl-val" id="dVal">2.0 cm</span></div>
+      <input type="range" id="d" min="0.5" max="15" step="0.1" value="2" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">무게중심 높이 h</span><span class="ctrl-val" id="hVal">1.5 cm</span></div>
+      <input type="range" id="h" min="0.5" max="5" step="0.1" value="1.5" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">앞바퀴 위치 <span style="color:#7aa">(앞단에서)</span></span><span class="ctrl-val" id="fwVal">1.0 cm</span></div>
+      <input type="range" id="fw" min="0" max="3" step="0.1" value="1" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">뒷바퀴 위치 <span style="color:#7aa">(뒷단에서)</span></span><span class="ctrl-val" id="rwVal">1.0 cm</span></div>
+      <input type="range" id="rw" min="0" max="3" step="0.1" value="1" />
+    </div>
+
+    <h2>저항 & 환경</h2>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">바퀴-축 마찰계수 μ<sub>b</sub></span><span class="ctrl-val" id="muVal">0.050</span></div>
+      <input type="range" id="mu" min="0.01" max="0.15" step="0.005" value="0.05" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">공기저항 Cd·A</span><span class="ctrl-val" id="cdaVal">0.0050 m²</span></div>
+      <input type="range" id="cda" min="0.001" max="0.02" step="0.0005" value="0.005" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">경사각 θ</span><span class="ctrl-val" id="thVal">30°</span></div>
+      <input type="range" id="th" min="20" max="45" step="1" value="30" />
+    </div>
+
+    <div class="ctrl">
+      <div class="ctrl-row"><span class="ctrl-name">트랙 길이 <span style="color:#7aa">(경사 4m + 평지)</span></span><span class="ctrl-val" id="trkVal">10.0 m</span></div>
+      <input type="range" id="trk" min="5" max="15" step="0.5" value="10" />
+    </div>
+
+    <h2>이론 검증</h2>
+    <div class="theory" id="theoryBox">
+      <div>앞바퀴 부양 조건:<br/>d ≥ h·tan(θ) = <span class="formula" id="liftThresh">0.87</span> cm</div>
+      <div style="margin-top:4px;">현재 d = <span class="formula" id="dCheck">2.0</span> cm → <span id="liftStatus" class="status-ok">안전</span></div>
+      <div style="margin-top:6px;">이론 종단속도(평형):<br/>v<sub>∞</sub> = √(2mg·sin θ / (ρ·CdA)) ≈ <span class="formula" id="vTerm">—</span> m/s</div>
+      <div style="margin-top:8px;border-top:1px dashed #455;padding-top:6px;">
+        <b style="color:#d4a017;">전환 손실(COM 효과):</b><br/>
+        ΔE = m·g·[d·sin θ + h·(1−cos θ)]<br/>
+        = <span class="formula" id="transLossPredict">—</span> J<br/>
+        <span style="color:#7aa">d를 작게(뒤로) 할수록 손실 ↓ → 빨라짐</span>
+      </div>
+    </div>
+
+    <label class="check-row"><input type="checkbox" id="showAxes" /> 차체 좌표축 표시</label>
+
+    <div class="btn-row">
+      <button id="startBtn">▶ 출발</button>
+      <button id="resetBtn" class="secondary">↺ 리셋</button>
+    </div>
+    <div class="btn-row">
+      <button id="saveBtn" class="secondary">💾 기록 저장</button>
+      <button id="clearRecBtn" class="secondary">🗑 비교 초기화</button>
+    </div>
+
+    <div class="records" id="recordsList"></div>
+
+    <footer>NSG Awana Trek · Pinewood Derby Physics Sim</footer>
+  </div>
+
+  <!-- ============== 중앙 캔버스 ============== -->
+  <div class="canvas-wrap">
+    <canvas id="scene" width="800" height="500"></canvas>
+    <div class="canvas-controls">
+      <button id="startBtn">▶ 출발</button>
+      <button id="resetBtn" class="secondary">↺ 리셋</button>
+    </div>
+  </div>
+
+  <!-- ============== 우측 결과 패널 ============== -->
+  <div class="panel" id="rightPanel">
+    <h1>📊 실시간 데이터</h1>
+
+    <div class="stat">
+      <span class="stat-label">경과 시간</span>
+      <span class="stat-val big" id="rTime">0.000 s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">위치 s</span>
+      <span class="stat-val" id="rPos">0.00 m</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">속도 v</span>
+      <span class="stat-val" id="rVel">0.00 m/s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">가속도 a</span>
+      <span class="stat-val" id="rAcc">0.00 m/s²</span>
+    </div>
+
+    <h2>수직항력 (정적)</h2>
+    <div class="stat">
+      <span class="stat-label">앞바퀴 N<sub>f</sub></span>
+      <span class="stat-val" id="rNf">— N</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">뒷바퀴 N<sub>r</sub></span>
+      <span class="stat-val" id="rNr">— N</span>
+    </div>
+    <div class="warn-box" id="liftWarn">⚠️ 앞바퀴 부양 발생 (Nf ≤ 0)</div>
+
+    <h2>슬로프→평지 전환</h2>
+    <div class="stat">
+      <span class="stat-label">전환 직전 v</span>
+      <span class="stat-val" id="rVbef">— m/s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">전환 직후 v</span>
+      <span class="stat-val" id="rVaft">— m/s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">전환 KE 손실</span>
+      <span class="stat-val" id="rTransLoss">— J</span>
+    </div>
+
+    <h2>최종 결과</h2>
+    <div class="stat">
+      <span class="stat-label">완주 시간</span>
+      <span class="stat-val big" id="rFinish">— s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">최고 속도</span>
+      <span class="stat-val" id="rVmax">— m/s</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">평균 가속도</span>
+      <span class="stat-val" id="rAavg">— m/s²</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">상태</span>
+      <span class="stat-val" id="rState">대기</span>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+ *  PINEWOOD DERBY PHYSICS SIMULATOR
+ *  - 내부 계산은 SI 단위 (m, kg, s)
+ *  - UI 입력/표시는 cm, g
+ * ========================================================================= */
+
+// ---------------- 상수 ----------------
+const G    = 9.81;       // 중력가속도 [m/s^2]
+const RHO  = 1.225;      // 공기 밀도 [kg/m^3]
+const DT   = 0.001;      // 시뮬레이션 step [s]  (1ms)
+const R_AXLE_RATIO = 0.1;     // r_axle / r_wheel 근사값
+const R_WHEEL = 0.006;        // 바퀴 반지름 [m]  (0.6cm)
+const SLOPE_LEN_M = 4.0;      // 경사부 길이 [m] (고정)
+
+// ---------------- 상태 ----------------
+const cfg = {
+  m: 0.142,        // [kg]
+  L: 0.165,        // [m] 휠베이스
+  d: 0.02,         // [m] 뒷축→COM 수평거리
+  h: 0.015,        // [m] COM 높이
+  fw: 0.01,        // [m] 앞단→앞바퀴
+  rw: 0.01,        // [m] 뒷단→뒷바퀴
+  mu: 0.05,        // 바퀴-축 마찰계수
+  CdA: 0.005,      // [m^2] 공기저항계수×단면적
+  theta: 30 * Math.PI/180,  // [rad]
+  trackLen: 10,    // [m] 총 트랙
+  showAxes: false
+};
+
+const sim = {
+  running: false,
+  finished: false,
+  t: 0,            // 경과 시간 [s]
+  s: 0,            // 경사 시작점부터의 누적 거리 [m]
+  v: 0,            // [m/s]
+  a: 0,            // [m/s^2]
+  vMax: 0,
+  onSlope: true,
+  Nf: 0,
+  Nr: 0,
+  lifted: false,
+  finishTime: null,
+  acc: { sum: 0, n: 0 },  // 평균 가속도 누적
+  vBeforeTrans: 0, // 전환 직전 속도 [m/s]
+  vAfterTrans: 0,  // 전환 직후 속도 [m/s]
+  transLossJ: 0    // 전환 시 잃은 KE [J]
+};
+
+const records = [];
+
+// ---------------- DOM ----------------
+const $ = id => document.getElementById(id);
+const canvas = $("scene");
+const ctx = canvas.getContext("2d");
+
+// 슬라이더 메타: id → {get from element, scale to SI, label format}
+const SLIDERS = [
+  { id: "m",   apply: v => cfg.m = v/1000,           label: v => `${v.toFixed(0)} g` },
+  { id: "L",   apply: v => cfg.L = v/100,            label: v => `${v.toFixed(1)} cm` },
+  { id: "d",   apply: v => cfg.d = v/100,            label: v => `${v.toFixed(1)} cm` },
+  { id: "h",   apply: v => cfg.h = v/100,            label: v => `${v.toFixed(1)} cm` },
+  { id: "fw",  apply: v => cfg.fw = v/100,           label: v => `${v.toFixed(1)} cm` },
+  { id: "rw",  apply: v => cfg.rw = v/100,           label: v => `${v.toFixed(1)} cm` },
+  { id: "mu",  apply: v => cfg.mu = v,               label: v => v.toFixed(3) },
+  { id: "cda", apply: v => cfg.CdA = v,              label: v => `${v.toFixed(4)} m²` },
+  { id: "th",  apply: v => cfg.theta = v*Math.PI/180, label: v => `${v.toFixed(0)}°` },
+  { id: "trk", apply: v => cfg.trackLen = v,         label: v => `${v.toFixed(1)} m` }
+];
+
+function readSliders() {
+  for (const s of SLIDERS) {
+    const el = $(s.id);
+    const v = parseFloat(el.value);
+    s.apply(v);
+    $(s.id + "Val").textContent = s.label(v);
+  }
+  cfg.showAxes = $("showAxes").checked;
+
+  // 휠베이스 vs d 제약: d <= L 로 clamp는 안하지만 경고색 정도만 표시
+  const dSlider = $("d");
+  const Lcm = parseFloat($("L").value);
+  if (parseFloat(dSlider.value) > Lcm) {
+    dSlider.value = Lcm;
+    cfg.d = Lcm/100;
+    $("dVal").textContent = `${Lcm.toFixed(1)} cm`;
+  }
+}
+
+function attachSliders() {
+  SLIDERS.forEach(s => {
+    $(s.id).addEventListener("input", () => {
+      readSliders();
+      updateTheory();
+      if (!sim.running) { resetSim(false); draw(); }
+    });
+  });
+  $("showAxes").addEventListener("change", () => {
+    cfg.showAxes = $("showAxes").checked;
+    if (!sim.running) draw();
+  });
+}
+
+// ---------------- 물리 계산 ----------------
+
+/**
+ * 경사로 위 정적 수직항력 계산
+ * 뒷축에 대한 모멘트 평형 → N_f, 전체 수직 평형 → N_r
+ *
+ * N_f = m·g·(cos θ · d − sin θ · h) / L
+ * N_r = m·g·(cos θ · (L−d) + sin θ · h) / L
+ *
+ * d : 뒷축에서 COM까지의 수평거리(경사면 평면상)
+ * h : COM의 수직거리(경사면 법선)
+ * N_f ≤ 0 이면 앞바퀴 부양
+ */
+function computeNormalForces() {
+  const W = cfg.m * G;
+  const c = Math.cos(cfg.theta), s = Math.sin(cfg.theta);
+  const Nf = W * (c * cfg.d - s * cfg.h) / cfg.L;
+  const Nr = W * (c * (cfg.L - cfg.d) + s * cfg.h) / cfg.L;
+  return { Nf, Nr, lifted: Nf <= 0 };
+}
+
+/**
+ * 경사면에서의 가속도
+ *   F_net = m·g·sin θ − F_axle − F_air
+ *   F_axle = μ_b · m·g·cos θ · (r_axle/r_wheel)
+ *   F_air  = 0.5 · ρ · CdA · v²
+ */
+function accelOnSlope(v) {
+  const Fgrav = cfg.m * G * Math.sin(cfg.theta);
+  const Faxle = cfg.mu * cfg.m * G * Math.cos(cfg.theta) * R_AXLE_RATIO;
+  const Fair  = 0.5 * RHO * cfg.CdA * v * v;
+  return (Fgrav - Faxle - Fair) / cfg.m;
+}
+
+/**
+ * 평지에서의 가속도 (감속)
+ *   F_net = − F_axle − F_air
+ */
+function accelOnFlat(v) {
+  if (v <= 0) return 0;
+  const Faxle = cfg.mu * cfg.m * G * R_AXLE_RATIO;
+  const Fair  = 0.5 * RHO * cfg.CdA * v * v;
+  return -(Faxle + Fair) / cfg.m;
+}
+
+/**
+ * 슬로프→평지 전환 시 에너지 보정
+ *
+ * 현실에서는 차체가 강체라서 앞바퀴가 평지에 닿은 후 뒷바퀴가 평지에 닿을 때까지
+ * 차체가 θ → 0 으로 회전한다. 이 동안 COM은 다음 높이만큼만 떨어진다:
+ *
+ *   COM 강하량 = (L_slope − d)·sin θ + h·(cos θ − 1)
+ *
+ * 그러나 단순 모델은 (뒷축이 슬로프 끝까지 이동) → L_slope·sin θ 만큼 떨어진
+ * 것으로 가정한다. 따라서 KE가 다음만큼 과대 추정된다:
+ *
+ *   ΔE_excess = m·g·[d·sin θ + h·(1 − cos θ)]
+ *
+ * 이 양만큼 v²를 보정하면 "COM이 뒤(d 작음)일수록 빠르다"는 실제 거동이 나타난다.
+ */
+function applyTransitionEnergy() {
+  const deficitH = cfg.d * Math.sin(cfg.theta) + cfg.h * (1 - Math.cos(cfg.theta));
+  const vBefore = sim.v;
+  const v2 = vBefore * vBefore - 2 * G * deficitH;
+  const vAfter = v2 > 0 ? Math.sqrt(v2) : 0;
+  sim.vBeforeTrans = vBefore;
+  sim.vAfterTrans = vAfter;
+  sim.transLossJ = 0.5 * cfg.m * (vBefore * vBefore - vAfter * vAfter);
+  sim.v = vAfter;
+}
+
+/**
+ * 한 step 적분 (semi-implicit Euler)
+ */
+function stepPhysics() {
+  if (sim.finished) return;
+
+  // 어느 구간인가?
+  const slopeLen = SLOPE_LEN_M;
+  const wasOnSlope = sim.onSlope;
+  sim.onSlope = sim.s < slopeLen;
+
+  // 슬로프 → 평지 전환 순간: COM 위치에 따른 KE 보정 1회 적용
+  if (wasOnSlope && !sim.onSlope) {
+    applyTransitionEnergy();
+  }
+
+  const a = sim.onSlope ? accelOnSlope(sim.v) : accelOnFlat(sim.v);
+  sim.a = a;
+
+  // semi-implicit Euler
+  sim.v = sim.v + a * DT;
+  if (!sim.onSlope && sim.v < 0) sim.v = 0;   // 평지에서 역주행 금지
+  sim.s = sim.s + sim.v * DT;
+  sim.t += DT;
+
+  // 통계
+  if (sim.v > sim.vMax) sim.vMax = sim.v;
+  if (sim.v > 0) { sim.acc.sum += a; sim.acc.n++; }
+
+  // 종료 조건
+  if (sim.s >= cfg.trackLen) {
+    sim.s = cfg.trackLen;
+    sim.finished = true;
+    sim.finishTime = sim.t;
+  } else if (!sim.onSlope && sim.v <= 1e-4 && sim.s > slopeLen) {
+    // 평지에서 정지
+    sim.finished = true;
+    sim.finishTime = sim.t;
+  }
+}
+
+// ---------------- 시뮬레이션 루프 ----------------
+let lastFrame = 0;
+function loop(ts) {
+  if (!lastFrame) lastFrame = ts;
+  const dtFrame = (ts - lastFrame) / 1000;
+  lastFrame = ts;
+
+  if (sim.running && !sim.finished) {
+    // 한 프레임에 여러 step 실행 (실시간 비례)
+    const steps = Math.min(2000, Math.ceil(dtFrame / DT));
+    for (let i = 0; i < steps; i++) {
+      stepPhysics();
+      if (sim.finished) break;
+    }
+    updateLiveStats();
+    if (sim.finished) finalizeRun();
+  }
+
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ---------------- 화면 좌표 변환 ----------------
+/**
+ * 경사 시작점은 캔버스 좌측 상단 근처, 경사를 내려가서 평지가 됨.
+ * 1 m 당 픽셀 스케일을 트랙 전체가 캔버스에 맞도록 자동 계산.
+ */
+function trackGeometry() {
+  const slope = SLOPE_LEN_M;
+  const flat  = Math.max(0, cfg.trackLen - slope);
+  const horizSpan = slope * Math.cos(cfg.theta) + flat;
+  const vertSpan  = slope * Math.sin(cfg.theta);
+  const padL = 50, padR = 30, padT = 30, padB = 80;
+  const availW = canvas.width - padL - padR;
+  const availH = canvas.height - padT - padB;
+  const scale = Math.min(availW / horizSpan, availH / vertSpan);
+  const px = m => m * scale;
+
+  // 경사 시작점
+  const x0 = padL;
+  const y0 = padT;
+  // 경사 끝점 (= 평지 시작점)
+  const x1 = x0 + px(slope * Math.cos(cfg.theta));
+  const y1 = y0 + px(slope * Math.sin(cfg.theta));
+  // 평지 끝점
+  const x2 = x1 + px(flat);
+  const y2 = y1;
+
+  return { scale, px, x0, y0, x1, y1, x2, y2, slope, flat, horizSpan, vertSpan };
+}
+
+/**
+ * 트랙 좌표 s (경사 시작점부터) → 캔버스상 (x, y) 와 차체 각도
+ */
+function pathToCanvas(s, geom) {
+  if (s <= geom.slope) {
+    const f = s / geom.slope;
+    return {
+      x: geom.x0 + (geom.x1 - geom.x0) * f,
+      y: geom.y0 + (geom.y1 - geom.y0) * f,
+      ang: cfg.theta
+    };
+  } else {
+    const flatS = s - geom.slope;
+    return {
+      x: geom.x1 + geom.px(flatS),
+      y: geom.y1,
+      ang: 0
+    };
+  }
+}
+
+// ---------------- 렌더링 ----------------
+function draw() {
+  const geom = trackGeometry();
+
+  // 배경(하늘)은 CSS gradient
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  drawSky();
+  drawTrack(geom);
+  drawMarkers(geom);
+  drawCar(geom);
+  drawHUD(geom);
+}
+
+function drawSky() {
+  // 하늘 그라데이션
+  const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+  grad.addColorStop(0, "#87ceeb");
+  grad.addColorStop(0.6, "#b8d8e8");
+  grad.addColorStop(1, "#d2e3ed");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+function drawTrack(geom) {
+  const { x0, y0, x1, y1, x2, y2 } = geom;
+  const groundY = canvas.height - 20;
+
+  // 경사 사다리꼴
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.lineTo(x1, groundY);
+  ctx.lineTo(x0, groundY);
+  ctx.closePath();
+  const grad1 = ctx.createLinearGradient(x0, y0, x1, y1);
+  grad1.addColorStop(0, "#6b4423");
+  grad1.addColorStop(1, "#5a3618");
+  ctx.fillStyle = grad1;
+  ctx.fill();
+  ctx.strokeStyle = "#3a2410";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 평지 사각형
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.lineTo(x2, groundY);
+  ctx.lineTo(x1, groundY);
+  ctx.closePath();
+  const grad2 = ctx.createLinearGradient(x1, y1, x1, groundY);
+  grad2.addColorStop(0, "#8a8a8a");
+  grad2.addColorStop(1, "#5e5e5e");
+  ctx.fillStyle = grad2;
+  ctx.fill();
+  ctx.strokeStyle = "#3a3a3a";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 경사 표면 라인
+  ctx.beginPath();
+  ctx.moveTo(x0, y0);
+  ctx.lineTo(x1, y1);
+  ctx.strokeStyle = "#2a1808";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // 평지 표면 라인
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.stroke();
+}
+
+function drawMarkers(geom) {
+  // 1m 눈금 (트랙 표면 위에 작은 틱)
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.font = "10px monospace";
+  ctx.textAlign = "center";
+
+  for (let m = 0; m <= cfg.trackLen; m++) {
+    const p = pathToCanvas(m, geom);
+    const nx = Math.sin(p.ang), ny = -Math.cos(p.ang);
+    const x1 = p.x + nx * 4, y1 = p.y + ny * 4;
+    const x2 = p.x + nx * 12, y2 = p.y + ny * 12;
+    ctx.strokeStyle = "rgba(255,255,255,0.85)";
+    ctx.lineWidth = m % 5 === 0 ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+    if (m % 1 === 0) {
+      ctx.fillStyle = "rgba(255,255,255,0.95)";
+      ctx.fillText(`${m}m`, p.x + nx * 22, p.y + ny * 22 + 4);
+    }
+  }
+
+  // 출발선 (경사 상단)
+  const start = pathToCanvas(0, geom);
+  ctx.save();
+  ctx.translate(start.x, start.y);
+  ctx.rotate(start.ang);
+  ctx.fillStyle = "#e74c3c";
+  ctx.fillRect(-2, -20, 4, 20);
+  ctx.restore();
+
+  // 결승선 (체크무늬, 트랙 끝)
+  const fin = pathToCanvas(cfg.trackLen, geom);
+  ctx.save();
+  ctx.translate(fin.x, fin.y);
+  ctx.rotate(fin.ang);
+  const cw = 4, ch = 4, rows = 5;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < 2; c++) {
+      ctx.fillStyle = (r + c) % 2 === 0 ? "#fff" : "#111";
+      ctx.fillRect((c - 1) * cw, -((r + 1) * ch), cw, ch);
+    }
+  }
+  ctx.restore();
+}
+
+function drawCar(geom) {
+  // 현재 위치: 자동차의 "기준점"을 뒷축 중심으로 잡는다.
+  // sim.s = 경사 시작점부터 차량 기준점이 이동한 거리.
+  // 차량 기준점은 뒷축 중심이라고 가정 (출발 시 s=0).
+
+  // 실제 차체 길이 = fw + L + rw
+  const bodyLenM = cfg.fw + cfg.L + cfg.rw;
+  // 차체 높이 (시각화용) — 2h ~ COM 위치를 자연스럽게
+  const bodyHeightM = Math.max(cfg.h * 2, 0.02);
+
+  // 뒷축 기준 → 차체 뒷단까지 거리 = rw
+  // 뒷축 기준 → 차체 앞단까지 = L + fw
+  // 그림 그릴 때는 뒷축 위치 = (s, y), 진행 방향(앞쪽)으로 회전된 좌표계.
+
+  const p = pathToCanvas(sim.s, geom);
+  let tiltOffset = 0;
+  // 앞바퀴 부양 시: 살짝 차체를 뒤로 기울임
+  if (sim.lifted && sim.onSlope) tiltOffset = -0.12; // rad
+
+  const ang = p.ang + tiltOffset;
+  const cos = Math.cos(ang), sin = Math.sin(ang);
+  const sc = geom.scale;
+
+  // 뒷축 픽셀 위치
+  // 단, 트랙 표면에서 바퀴 반지름만큼 위로 (바퀴는 트랙에 접하고 차체는 바퀴 위)
+  const wheelR = R_WHEEL * sc * 2;  // 시각상 약간 크게
+  const normalX = Math.sin(ang), normalY = -Math.cos(ang);  // 트랙 법선 (위쪽)
+
+  const axleX = p.x + normalX * wheelR;
+  const axleY = p.y + normalY * wheelR;
+
+  ctx.save();
+  ctx.translate(axleX, axleY);
+  ctx.rotate(ang);  // 캔버스 +x 방향이 진행방향 (앞쪽), +y는 차체 아래 방향(법선 반대)
+
+  // 차체 진행방향(+x)으로 +쪽이 앞. 차량 좌표:
+  //   뒷축은 x=0
+  //   차체 뒷단: x = -rw_px
+  //   차체 앞단: x = (L + fw)_px
+  //   차체 바닥: y = -bodyHeightM*sc - ... 시각조정
+  //   차체 윗면: y = -bodyHeightM*sc -...
+  const px = m => m * sc;
+  const rearX = -px(cfg.rw);
+  const frontX = px(cfg.L + cfg.fw);
+  // 차체 본체는 바퀴 위에 있다고 보고 y는 모두 음수 방향 (캔버스에서 위쪽)
+  const bodyBottomY = -px(R_WHEEL); // 바퀴 반경의 1배만큼 위로 띄움 (시각적으로)
+  const bodyTopY = bodyBottomY - px(bodyHeightM);
+
+  // 차체 - 네이비 베이스
+  ctx.beginPath();
+  ctx.moveTo(rearX, bodyBottomY);
+  ctx.lineTo(rearX + px(0.005), bodyTopY);   // 살짝 사선
+  ctx.lineTo(frontX - px(0.005), bodyTopY);
+  ctx.lineTo(frontX, bodyBottomY);
+  ctx.closePath();
+  const carGrad = ctx.createLinearGradient(0, bodyTopY, 0, bodyBottomY);
+  carGrad.addColorStop(0, "#2c5282");
+  carGrad.addColorStop(1, "#1e3a5f");
+  ctx.fillStyle = carGrad;
+  ctx.fill();
+  ctx.strokeStyle = "#0e1d33";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // 골드 스트라이프
+  ctx.beginPath();
+  const stripeY = (bodyTopY + bodyBottomY)/2;
+  ctx.moveTo(rearX + px(0.005), stripeY);
+  ctx.lineTo(frontX - px(0.005), stripeY);
+  ctx.strokeStyle = "#d4a017";
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // 차량 번호/로고 영역
+  ctx.fillStyle = "#d4a017";
+  ctx.font = `bold ${Math.max(8, Math.floor(px(0.012)))}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  // 글자가 뒤집힐 수 있으므로 진행방향에 맞춰 그리기 (그냥 그대로)
+  ctx.save();
+  ctx.translate((rearX + frontX)/2, (bodyTopY + bodyBottomY)/2);
+  // 평지에서는 위에서 잘 보이지만 경사에선 회전됨. 그대로 둠.
+  ctx.fillText("NSG", 0, 0);
+  ctx.restore();
+
+  // 바퀴 (뒷바퀴 x=0, 앞바퀴 x=px(L))
+  const wheelPx = px(R_WHEEL);
+  const wheelAngle = sim.v / R_WHEEL * sim.t;  // 회전각 (시각용)
+  drawWheel(0, 0, wheelPx, wheelAngle);
+  drawWheel(px(cfg.L), 0, wheelPx, wheelAngle);
+
+  // 무게중심 (뒷축에서 +d, 위쪽으로 +h)
+  const comX = px(cfg.d);
+  const comY = -px(R_WHEEL) - px(cfg.h);   // 바닥에서 h만큼 위 (차체 좌표)
+  // 살짝 음영
+  ctx.beginPath();
+  ctx.arc(comX, comY, 5.5, 0, Math.PI*2);
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(comX, comY, 4, 0, Math.PI*2);
+  ctx.fillStyle = "#ff3030";
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // 좌표축 (선택)
+  if (cfg.showAxes) {
+    ctx.strokeStyle = "#00ff88";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(px(0.04), 0);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -px(0.04));
+    ctx.stroke();
+    ctx.fillStyle = "#00ff88";
+    ctx.font = "10px monospace";
+    ctx.textAlign = "left";
+    ctx.fillText("s", px(0.045), 3);
+    ctx.fillText("n", 3, -px(0.045));
+  }
+
+  ctx.restore();
+
+  // ⚠ 부양 마크 (차량 위, 회전 무시)
+  if (sim.lifted) {
+    ctx.fillStyle = "#e74c3c";
+    ctx.font = "bold 18px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("⚠️", axleX, axleY - 50);
+  }
+
+  // 속도 라벨
+  if (sim.running || sim.finished) {
+    ctx.fillStyle = "rgba(0,0,0,0.7)";
+    ctx.fillRect(axleX - 28, axleY - 78, 56, 18);
+    ctx.fillStyle = "#fff";
+    ctx.font = "11px monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`${sim.v.toFixed(2)} m/s`, axleX, axleY - 65);
+  }
+}
+
+function drawWheel(cx, cy, r, angle) {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(angle);
+  // 타이어
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI*2);
+  const wg = ctx.createRadialGradient(0,0, r*0.2, 0,0, r);
+  wg.addColorStop(0, "#444");
+  wg.addColorStop(1, "#111");
+  ctx.fillStyle = wg;
+  ctx.fill();
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1;
+  ctx.stroke();
+  // 휠 스포크
+  ctx.strokeStyle = "#d4a017";
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-r*0.7, 0);
+  ctx.lineTo(r*0.7, 0);
+  ctx.moveTo(0, -r*0.7);
+  ctx.lineTo(0, r*0.7);
+  ctx.stroke();
+  // 허브
+  ctx.beginPath();
+  ctx.arc(0,0, r*0.25, 0, Math.PI*2);
+  ctx.fillStyle = "#d4a017";
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * 캔버스가 CSS로 축소된 비율 보정값.
+ * 모바일에서 캔버스가 작아질수록 HUD/마커 글씨를 크게 그려서
+ * 화면상 가독성이 유지되도록 한다.
+ */
+function uiScale() {
+  const rect = canvas.getBoundingClientRect();
+  if (!rect.width) return 1;
+  const displayScale = rect.width / canvas.width;  // < 1 이면 축소됨
+  // 1.0 ~ 2.2 사이로 clamp
+  return Math.max(1, Math.min(2.2, 1 / displayScale));
+}
+
+function drawHUD(geom) {
+  const k = uiScale();
+  const px = (n) => Math.round(n * k);
+
+  // 좌측 상단 큰 시간
+  const w1 = px(200), h1 = px(56), pad = px(10);
+  ctx.fillStyle = "rgba(15,26,43,0.85)";
+  ctx.fillRect(pad, pad, w1, h1);
+  ctx.fillStyle = "#d4a017";
+  ctx.font = `bold ${px(13)}px sans-serif`;
+  ctx.textAlign = "left";
+  ctx.fillText("ELAPSED", pad + px(10), pad + px(18));
+  ctx.fillStyle = "#fff";
+  ctx.font = `bold ${px(26)}px monospace`;
+  ctx.fillText(`${sim.t.toFixed(3)} s`, pad + px(10), pad + px(46));
+
+  // 우상단 상태
+  const w2 = px(160), h2 = px(60);
+  ctx.fillStyle = "rgba(15,26,43,0.85)";
+  ctx.fillRect(canvas.width - w2 - pad, pad, w2, h2);
+  ctx.fillStyle = "#97a3bd";
+  ctx.font = `${px(11)}px sans-serif`;
+  ctx.textAlign = "left";
+  const rx = canvas.width - w2 - pad + px(10);
+  ctx.fillText(sim.onSlope ? "▼ 경사 구간" : "→ 평지 구간", rx, pad + px(18));
+  ctx.fillStyle = "#e6edf7";
+  ctx.font = `bold ${px(13)}px monospace`;
+  ctx.fillText(`s = ${sim.s.toFixed(2)} m`, rx, pad + px(37));
+  ctx.fillText(`v = ${sim.v.toFixed(2)} m/s`, rx, pad + px(53));
+
+  // 비교 기록 표시 (좌하단)
+  if (records.length > 0) {
+    const lineH = px(16);
+    let yy = canvas.height - px(14) - records.length * lineH;
+    ctx.fillStyle = "rgba(15,26,43,0.85)";
+    ctx.fillRect(pad, yy - px(18), px(230), records.length * lineH + px(24));
+    ctx.fillStyle = "#d4a017";
+    ctx.font = `bold ${px(11)}px sans-serif`;
+    ctx.fillText("저장된 기록", pad + px(8), yy - px(4));
+    ctx.font = `${px(11)}px monospace`;
+    ctx.fillStyle = "#e6edf7";
+    records.forEach((r, i) => {
+      ctx.fillText(`${i+1}. ${r.name}  →  ${r.finishTime.toFixed(3)}s`, pad + px(8), yy + i * lineH + px(10));
+    });
+  }
+}
+
+// ---------------- UI 업데이트 ----------------
+function updateLiveStats() {
+  $("rTime").textContent = `${sim.t.toFixed(3)} s`;
+  $("rPos").textContent = `${sim.s.toFixed(2)} m`;
+  $("rVel").textContent = `${sim.v.toFixed(2)} m/s`;
+  $("rAcc").textContent = `${sim.a.toFixed(2)} m/s²`;
+
+  const { Nf, Nr, lifted } = computeNormalForces();
+  sim.Nf = Nf; sim.Nr = Nr; sim.lifted = lifted;
+  $("rNf").textContent = `${Nf.toFixed(3)} N`;
+  $("rNr").textContent = `${Nr.toFixed(3)} N`;
+  $("liftWarn").classList.toggle("show", lifted);
+
+  $("rState").textContent = sim.finished ? "완주/정지" : (sim.running ? "주행중" : "대기");
+}
+
+function finalizeRun() {
+  sim.running = false;
+  syncStartBtnLabel("▶ 출발");
+  const avgA = sim.acc.n > 0 ? sim.acc.sum / sim.acc.n : 0;
+  $("rFinish").textContent = `${sim.finishTime.toFixed(3)} s`;
+  $("rVmax").textContent = `${sim.vMax.toFixed(2)} m/s`;
+  $("rAavg").textContent = `${avgA.toFixed(2)} m/s²`;
+  $("rState").textContent = sim.s >= cfg.trackLen ? "완주" : "정지";
+  $("rVbef").textContent = `${sim.vBeforeTrans.toFixed(3)} m/s`;
+  $("rVaft").textContent = `${sim.vAfterTrans.toFixed(3)} m/s`;
+  $("rTransLoss").textContent = `${sim.transLossJ.toFixed(4)} J`;
+}
+
+function updateTheory() {
+  // 부양 임계 d_crit = h * tan(θ)
+  const dCritCm = (cfg.h * Math.tan(cfg.theta)) * 100;
+  const dCm = cfg.d * 100;
+  $("liftThresh").textContent = dCritCm.toFixed(2);
+  $("dCheck").textContent = dCm.toFixed(1);
+  const liftEl = $("liftStatus");
+  if (dCm >= dCritCm) {
+    liftEl.textContent = "안전";
+    liftEl.className = "status-ok";
+  } else {
+    liftEl.textContent = "위험 (부양)";
+    liftEl.className = "status-bad";
+  }
+
+  // 종단 속도 (공기저항 vs 중력성분 평형, 마찰 무시 단순 근사)
+  // v_inf = sqrt(2 m g sin θ / (ρ CdA))
+  const vTerm = Math.sqrt(2 * cfg.m * G * Math.sin(cfg.theta) / (RHO * cfg.CdA));
+  $("vTerm").textContent = vTerm.toFixed(2);
+
+  // 전환 손실 예측값 (m·g·[d·sin θ + h·(1−cos θ)])
+  const transLoss = cfg.m * G * (cfg.d * Math.sin(cfg.theta) + cfg.h * (1 - Math.cos(cfg.theta)));
+  $("transLossPredict").textContent = transLoss.toFixed(4);
+
+  // 정적 수직항력도 갱신
+  const { Nf, Nr, lifted } = computeNormalForces();
+  if (!sim.running) {
+    $("rNf").textContent = `${Nf.toFixed(3)} N`;
+    $("rNr").textContent = `${Nr.toFixed(3)} N`;
+    $("liftWarn").classList.toggle("show", lifted);
+    sim.lifted = lifted;
+  }
+}
+
+// ---------------- 제어 ----------------
+function syncStartBtnLabel(label) {
+  $("startBtn").textContent = label;
+}
+
+function resetSim(redraw = true) {
+  sim.running = false;
+  sim.finished = false;
+  sim.t = 0; sim.s = 0; sim.v = 0; sim.a = 0;
+  sim.vMax = 0;
+  sim.onSlope = true;
+  sim.finishTime = null;
+  sim.acc = { sum: 0, n: 0 };
+  sim.vBeforeTrans = 0;
+  sim.vAfterTrans = 0;
+  sim.transLossJ = 0;
+  syncStartBtnLabel("▶ 출발");
+  $("rTime").textContent = "0.000 s";
+  $("rPos").textContent = "0.00 m";
+  $("rVel").textContent = "0.00 m/s";
+  $("rAcc").textContent = "0.00 m/s²";
+  $("rFinish").textContent = "— s";
+  $("rVmax").textContent = "— m/s";
+  $("rAavg").textContent = "— m/s²";
+  $("rState").textContent = "대기";
+  $("rVbef").textContent = "— m/s";
+  $("rVaft").textContent = "— m/s";
+  $("rTransLoss").textContent = "— J";
+  updateTheory();
+  if (redraw) draw();
+}
+
+function startSim() {
+  if (sim.finished) resetSim(false);
+  sim.running = !sim.running;
+  syncStartBtnLabel(sim.running ? "⏸ 일시정지" : "▶ 출발");
+}
+
+function saveRecord() {
+  if (!sim.finished) return;
+  if (records.length >= 3) records.shift();
+  records.push({
+    name: `m=${(cfg.m*1000).toFixed(0)}g d=${(cfg.d*100).toFixed(1)} θ=${(cfg.theta*180/Math.PI).toFixed(0)}°`,
+    finishTime: sim.finishTime,
+    vMax: sim.vMax
+  });
+  renderRecordsList();
+}
+
+function renderRecordsList() {
+  const wrap = $("recordsList");
+  wrap.innerHTML = "";
+  records.forEach((r, i) => {
+    const div = document.createElement("div");
+    div.className = "record-item";
+    div.innerHTML = `<span class="rec-name">${i+1}. ${r.name}</span>
+      <span class="rec-time">${r.finishTime.toFixed(3)}s</span>`;
+    const btn = document.createElement("button");
+    btn.className = "rec-del";
+    btn.textContent = "✕";
+    btn.onclick = () => { records.splice(i,1); renderRecordsList(); };
+    div.appendChild(btn);
+    wrap.appendChild(div);
+  });
+}
+
+// ---------------- 초기화 ----------------
+function init() {
+  attachSliders();
+  readSliders();
+  updateTheory();
+  resetSim(false);
+
+  $("startBtn").addEventListener("click", startSim);
+  $("resetBtn").addEventListener("click", () => resetSim(true));
+  $("saveBtn").addEventListener("click", saveRecord);
+  $("clearRecBtn").addEventListener("click", () => { records.length = 0; renderRecordsList(); draw(); });
+
+  requestAnimationFrame(loop);
+}
+
+init();
+</script>
+<div class="bottom-banner">made by <span class="brand">Jpro</span></div>
+</body>
+</html>
